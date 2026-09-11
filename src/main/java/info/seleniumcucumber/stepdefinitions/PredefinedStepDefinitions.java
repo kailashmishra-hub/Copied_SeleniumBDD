@@ -243,6 +243,7 @@ public class PredefinedStepDefinitions implements BaseTest {
 	public void check_element_presence(String type,String accessName,String present) throws Exception
 	{
 		miscmethodObj.validateLocator(type);
+		miscmethodObj.valid_locator_type(type);
 		assertionObj.checkElementPresence(type, accessName, present.isEmpty());
 	}
 	

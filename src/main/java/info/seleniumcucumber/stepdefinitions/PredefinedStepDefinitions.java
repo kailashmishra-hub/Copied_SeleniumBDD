@@ -39,7 +39,8 @@ public class PredefinedStepDefinitions implements BaseTest {
 	@Then("^I navigate back")
 	public void navigate_back()
 	{
-		navigationObj.navigate("forward");
+
+		navigationObj.navigate("back");
 	}
 	
 	// steps to refresh page

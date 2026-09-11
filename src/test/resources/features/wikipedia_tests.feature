@@ -17,7 +17,6 @@ Feature: Wikipedia search
        And I click on element having class "pure-button-primary-progressive"
        Then I should see page title having partial text as "Selenium"
        And element having id "searchInput" should be present
-       And I navigate back
        Then I close browser
 
  Scenario: Search for Java in English

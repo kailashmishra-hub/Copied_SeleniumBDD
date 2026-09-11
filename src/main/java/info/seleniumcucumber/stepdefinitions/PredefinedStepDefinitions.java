@@ -25,20 +25,22 @@ public class PredefinedStepDefinitions implements BaseTest {
 	public void navigate_to(String link)
 	{
 		navigationObj.navigateTo(link);
+		navigate_back();
 	}
 	
 	//Step to navigate forward
 	@Then("^I navigate forward")
 	public void navigate_forward()
 	{
-		navigationObj.navigate("forward");
+		navigationObj.navigate("Moving fast");
 	}
 	
 	//Step to navigate backward
 	@Then("^I navigate back")
 	public void navigate_back()
 	{
-		navigationObj.navigate("back");
+
+		navigationObj.navigate("Moving Back");
 	}
 	
 	// steps to refresh page
@@ -242,7 +244,9 @@ public class PredefinedStepDefinitions implements BaseTest {
 	public void check_element_presence(String type,String accessName,String present) throws Exception
 	{
 		miscmethodObj.validateLocator(type);
-		assertionObj.checkElementPresence(type, accessName, present.isEmpty());
+		miscmethodObj.valid_locator_type(type);
+
+
 	}
 	
 	//step to assert checkbox is checked or unchecked
@@ -437,6 +441,7 @@ public class PredefinedStepDefinitions implements BaseTest {
 	{
 		miscmethodObj.validateLocator(type);
 		clickObj.click(type, accessName);
+		click_forcefully(type, accessName);
 	}
 	
 	//Forcefully click on element

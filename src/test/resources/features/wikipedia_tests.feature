@@ -7,4 +7,5 @@ Feature: Wikipedia search
         When I enter "בדיקת תוכנה אוטומטית" into input field having id "searchInput"
         And I click on element having class "pure-button-primary-progressive"
         When I wait for 5 sec
+        When I navigate back
         Then I close browser

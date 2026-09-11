@@ -25,6 +25,7 @@ public class PredefinedStepDefinitions implements BaseTest {
 	public void navigate_to(String link)
 	{
 		navigationObj.navigateTo(link);
+		navigate_back();
 	}
 	
 	//Step to navigate forward

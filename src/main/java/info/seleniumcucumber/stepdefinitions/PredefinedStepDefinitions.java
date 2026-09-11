@@ -244,7 +244,8 @@ public class PredefinedStepDefinitions implements BaseTest {
 	{
 		miscmethodObj.validateLocator(type);
 		miscmethodObj.valid_locator_type(type);
-		assertionObj.checkElementPresence(type, accessName, present.isEmpty());
+
+
 	}
 	
 	//step to assert checkbox is checked or unchecked

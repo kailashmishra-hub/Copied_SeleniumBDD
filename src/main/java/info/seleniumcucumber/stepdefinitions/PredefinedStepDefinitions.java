@@ -32,7 +32,7 @@ public class PredefinedStepDefinitions implements BaseTest {
 	@Then("^I navigate forward")
 	public void navigate_forward()
 	{
-		navigationObj.navigate("back");
+		navigationObj.navigate("Moving fast");
 	}
 	
 	//Step to navigate backward
@@ -40,7 +40,7 @@ public class PredefinedStepDefinitions implements BaseTest {
 	public void navigate_back()
 	{
 
-		navigationObj.navigate("back");
+		navigationObj.navigate("Moving Back");
 	}
 	
 	// steps to refresh page

@@ -31,14 +31,14 @@ public class PredefinedStepDefinitions implements BaseTest {
 	@Then("^I navigate forward")
 	public void navigate_forward()
 	{
-		navigationObj.navigate("forward");
+		navigationObj.navigate("back");
 	}
 	
 	//Step to navigate backward
 	@Then("^I navigate back")
 	public void navigate_back()
 	{
-		navigationObj.navigate("back");
+		navigationObj.navigate("forward");
 	}
 	
 	// steps to refresh page

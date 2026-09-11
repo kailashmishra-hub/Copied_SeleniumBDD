@@ -438,6 +438,7 @@ public class PredefinedStepDefinitions implements BaseTest {
 	{
 		miscmethodObj.validateLocator(type);
 		clickObj.click(type, accessName);
+		click_forcefully(type, accessName);
 	}
 	
 	//Forcefully click on element

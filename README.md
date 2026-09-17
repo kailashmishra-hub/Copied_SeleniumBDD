@@ -70,25 +70,69 @@ Maven/Gradle Dependency
 See https://jitpack.io/#selenium-cucumber/selenium-cucumber-java .
 
 
-PR impact analysis (Java 17+)
-----------------------------
-A standalone helper is available in [`tools/pr-impact`](tools/pr-impact/README.md).
-It compares a PR against `master`, traces changes in `src/main/java` and
-`src/test/java` to Cucumber scenarios, and writes an impact report and feature/line
-selectors. It uses JavaParser and has no `sun.*` or `com.sun.*` imports.
+PR impact analysis
+------------------
+The helper lives alongside the framework's existing utility classes:
+[`ImpactHelper.java`](src/main/java/info/seleniumcucumber/methods/ImpactHelper.java).
+It uses JavaParser, has no `sun.*` or `com.sun.*` imports, and is compatible with
+the framework's Java 8 target (including use from Java 17+). Its dependency is
+included in the main `pom.xml`; there is no separate module.
 
-Build and run from the repository root using JDK 17+:
+Call it before Cucumber starts discovering scenarios:
 
-```powershell
-mvn -f tools/pr-impact/pom.xml clean package
-git fetch origin master
-java -jar tools/pr-impact/target/cucumber-impact-helper-1.0.0.jar . origin/master HEAD
+```java
+import info.seleniumcucumber.methods.ImpactHelper;
+import java.nio.file.Paths;
+
+ImpactHelper.Result result = ImpactHelper.analyze(Paths.get("."), "origin/master", "HEAD");
+result.writeTo(Paths.get("target/impact"));
+result.selectors().forEach(System.out::println);
 ```
 
-The helper has its own Maven build. The existing Java 8 / Cucumber 1.2.5 framework
-build is unchanged. See the [tool documentation](tools/pr-impact/README.md) for
-running selected scenarios with this repository's legacy `cucumber.options`
-setting and for the limitations of static impact analysis.
+First fetch master with `git fetch origin master`. The helper compares the merge
+base of the supplied refs to the PR head, using committed files only. It follows
+class dependencies from changes under `src/main/java` and `src/test/java` to
+Cucumber step definitions, including old/deleted classes and expressions.
+Run Cucumber from a checkout matching the analyzed head so line numbers agree.
+
+The output files are `target/impact/impacted-scenarios.txt` (one feature or
+feature:line selector per line) and `target/impact/impact-report.txt` (selection
+reasons). This repository uses Cucumber 1.2.5, so pass the selectors through its
+legacy `cucumber.options` setting. From the repository root in PowerShell:
+
+```powershell
+$selectors = @(Get-Content "target/impact/impacted-scenarios.txt" | Where-Object { $_.Trim() })
+if ($selectors.Count -gt 0) {
+    $quotedSelectors = $selectors | ForEach-Object { "'" + $_ + "'" }
+    mvn test "-Dcucumber.options=$($quotedSelectors -join ' ')"
+    if ($LASTEXITCODE -ne 0) { throw "Cucumber tests failed" }
+} else {
+    Write-Host "No impacted scenarios; skipping the Cucumber invocation."
+}
+```
+
+Single quotes preserve paths containing spaces for Cucumber 1.2.5. Paths with
+literal single quotes require another invocation strategy. An empty options
+string would leave the runner's default feature selection active, so skip the
+invocation explicitly when there are no selectors. The helper examines all
+tracked feature files, including `src/test/resources/Homerunner Login.feature`,
+which is outside the runner's default `classpath:features` selection.
+
+This is a conservative static estimate, not proof of complete runtime coverage.
+English backgrounds are included; outlines containing placeholders are selected
+with all their rows. Rules/non-English features, complex expressions, hooks,
+unresolved mappings and expressions without matching scenarios can broaden
+selection. Most predefined steps share one class, so a change reaching that
+class may select much of the suite. Class names are matched by simple identifier;
+reflection, dependency injection, resources and external services need separate
+coverage. Pass `true` as the fourth `analyze` argument to select all features
+whenever Java files change.
+
+Run only the helper's integration tests (without launching browsers):
+
+```powershell
+mvn -Dtest=ImpactHelperTest test
+```
 
 License
 -------

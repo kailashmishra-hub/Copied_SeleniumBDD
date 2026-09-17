@@ -1,4 +1,4 @@
-package info.seleniumcucumber.impact;
+package info.seleniumcucumber.methods;
 
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParserConfiguration;
@@ -26,20 +26,33 @@ import java.util.stream.Collectors;
 
 /** Class-level, conservative static impact analysis for annotation-based Cucumber Java. */
 public final class ImpactHelper {
-    private static final Set<String> STEPS = Set.of("Given", "When", "Then", "And", "But");
-    private static final Set<String> GLOBAL = Set.of("Before", "After", "BeforeStep", "AfterStep",
+    private static final Set<String> STEPS = set("Given", "When", "Then", "And", "But");
+    private static final Set<String> GLOBAL = set("Before", "After", "BeforeStep", "AfterStep",
             "BeforeAll", "AfterAll", "ParameterType", "DataTableType", "DefaultParameterTransformer",
             "DefaultDataTableEntryTransformer", "DefaultDataTableCellTransformer", "DocStringType",
             "CucumberOptions", "ConfigurationParameter", "ConfigurationParameters");
 
-    public record Result(String baseCommit, String headCommit, Set<String> changedJavaFiles,
-                         Set<String> affectedJavaFiles, List<String> selectors, List<String> reasons) {
-        public Result {
-            changedJavaFiles = Collections.unmodifiableSet(new TreeSet<>(changedJavaFiles));
-            affectedJavaFiles = Collections.unmodifiableSet(new TreeSet<>(affectedJavaFiles));
-            selectors = List.copyOf(selectors);
-            reasons = List.copyOf(reasons);
+    public static final class Result {
+        private final String baseCommit;
+        private final String headCommit;
+        private final Set<String> changedJavaFiles;
+        private final Set<String> affectedJavaFiles;
+        private final List<String> selectors;
+        private final List<String> reasons;
+        public Result(String baseCommit, String headCommit, Set<String> changedJavaFiles, Set<String> affectedJavaFiles, List<String> selectors, List<String> reasons) {
+            this.baseCommit = baseCommit;
+            this.headCommit = headCommit;
+            this.changedJavaFiles = Collections.unmodifiableSet(new TreeSet<>(changedJavaFiles));
+            this.affectedJavaFiles = Collections.unmodifiableSet(new TreeSet<>(affectedJavaFiles));
+            this.selectors = Collections.unmodifiableList(new ArrayList<>(selectors));
+            this.reasons = Collections.unmodifiableList(new ArrayList<>(reasons));
         }
+        public String baseCommit() { return baseCommit; }
+        public String headCommit() { return headCommit; }
+        public Set<String> changedJavaFiles() { return changedJavaFiles; }
+        public Set<String> affectedJavaFiles() { return affectedJavaFiles; }
+        public List<String> selectors() { return selectors; }
+        public List<String> reasons() { return reasons; }
         public void writeTo(Path directory) throws IOException {
             Files.createDirectories(directory);
             Files.write(directory.resolve("impacted-scenarios.txt"), selectors, StandardCharsets.UTF_8);
@@ -48,7 +61,7 @@ public final class ImpactHelper {
                     + "\n\nAffected Java files (transitive):\n" + String.join("\n", affectedJavaFiles)
                     + "\n\nSelection reasons:\n" + String.join("\n", reasons)
                     + "\n\nCucumber selectors:\n" + String.join("\n", selectors) + "\n";
-            Files.writeString(directory.resolve("impact-report.txt"), report, StandardCharsets.UTF_8);
+            Files.write(directory.resolve("impact-report.txt"), report.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -57,8 +70,31 @@ public final class ImpactHelper {
         final List<String> expressions = new ArrayList<>();
         boolean global, unknownExpression;
     }
-    private record Scenario(int line, List<String> steps) { }
-    private record Feature(List<Scenario> scenarios, boolean unsupported) { }
+    private static final class Scenario {
+        final int line;
+        final List<String> steps;
+        Scenario(int line, List<String> steps) { this.line = line; this.steps = steps; }
+    }
+    private static final class Feature {
+        final List<Scenario> scenarios;
+        final boolean unsupported;
+        Feature(List<Scenario> scenarios, boolean unsupported) {
+            this.scenarios = scenarios; this.unsupported = unsupported;
+        }
+    }
+
+    @SafeVarargs
+    private static <T> Set<T> set(T... values) {
+        return new HashSet<>(Arrays.asList(values));
+    }
+
+    private static byte[] readBytes(InputStream stream) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int length;
+        while ((length = stream.read(buffer)) != -1) output.write(buffer, 0, length);
+        return output.toByteArray();
+    }
 
     /** Analyze committed snapshots. Checkout headRef before executing the returned selectors. */
     public static Result analyze(Path repository, String baseRef, String headRef) throws IOException {
@@ -87,7 +123,7 @@ public final class ImpactHelper {
         boolean all = forceAllOnJavaChange && !javaChanges.isEmpty();
         if (all) reasons.add("Full-suite mode: Java files changed.");
         for (String path : affected) {
-            for (Map<String, Source> revision : List.of(oldSources, newSources)) {
+            for (Map<String, Source> revision : Arrays.asList(oldSources, newSources)) {
                 Source source = revision.get(path);
                 if (source == null) continue;
                 expressions.addAll(source.expressions);
@@ -99,7 +135,7 @@ public final class ImpactHelper {
         }
         // Each changed file must independently reach glue; another mapped file must not mask it.
         for (String changedPath : javaChanges) {
-            boolean mapped = closure(Set.of(changedPath), reverse).stream().anyMatch(path ->
+            boolean mapped = closure(set(changedPath), reverse).stream().anyMatch(path ->
                     hasGlue(oldSources.get(path)) || hasGlue(newSources.get(path)));
             if (!mapped) {
                 all = true;
@@ -118,7 +154,7 @@ public final class ImpactHelper {
             }
         }
         List<String> selectors = new ArrayList<>();
-        for (var entry : features.entrySet()) {
+        for (Map.Entry<String, Feature> entry : features.entrySet()) {
             String path = entry.getKey();
             Feature feature = entry.getValue();
             if (all || changed.contains(path) || (!javaChanges.isEmpty() && feature.unsupported)) {
@@ -138,7 +174,7 @@ public final class ImpactHelper {
         if (features.isEmpty() && !javaChanges.isEmpty())
             throw new IOException("No tracked .feature files found at head; cannot derive scenarios.");
         reasons.add("Static class-level estimate. Reflection, external services, resources and runtime wiring may require a full suite.");
-        return new Result(base, head, javaChanges, affected, selectors, reasons.stream().distinct().toList());
+        return new Result(base, head, javaChanges, affected, selectors, reasons.stream().distinct().collect(Collectors.toList()));
     }
 
     private static boolean hasGlue(Source s) {
@@ -164,22 +200,22 @@ public final class ImpactHelper {
     }
 
     private static String git(Path root, String... arguments) throws IOException {
-        List<String> command = new ArrayList<>(List.of("git", "-C", root.toString()));
-        command.addAll(List.of(arguments));
+        List<String> command = new ArrayList<>(Arrays.asList("git", "-C", root.toString()));
+        command.addAll(Arrays.asList(arguments));
         Process process = new ProcessBuilder(command).start();
         // Drain stderr independently: warnings must not contaminate NUL-delimited filenames or source.
         ByteArrayOutputStream errors = new ByteArrayOutputStream();
         Thread reader = new Thread(() -> {
-            try (InputStream stream = process.getErrorStream()) { stream.transferTo(errors); }
+            try (InputStream stream = process.getErrorStream()) { errors.write(readBytes(stream)); }
             catch (IOException ignored) { /* Nonzero exit still propagates below. */ }
         }, "impact-git-stderr");
         reader.start();
         try {
-            byte[] output = process.getInputStream().readAllBytes();
+            byte[] output = readBytes(process.getInputStream());
             int status = process.waitFor();
             reader.join();
             if (status != 0) throw new IOException("Git failed (" + String.join(" ", arguments) + "): "
-                    + errors.toString(StandardCharsets.UTF_8));
+                    + new String(errors.toByteArray(), StandardCharsets.UTF_8));
             return new String(output, StandardCharsets.UTF_8);
         } catch (InterruptedException e) {
             process.destroyForcibly();
@@ -192,34 +228,51 @@ public final class ImpactHelper {
         JavaParser parser = new JavaParser(new ParserConfiguration()
                 .setLanguageLevel(ParserConfiguration.LanguageLevel.BLEEDING_EDGE));
         Map<String, Source> result = new TreeMap<>();
-        for (var entry : files.entrySet()) {
+        for (Map.Entry<String, String> entry : files.entrySet()) {
             if (!javaPath(entry.getKey())) continue;
-            var parsed = parser.parse(entry.getValue());
-            if (!parsed.isSuccessful() || parsed.getResult().isEmpty()) {
+            com.github.javaparser.ParseResult<com.github.javaparser.ast.CompilationUnit> parsed = parser.parse(entry.getValue());
+            if (!parsed.isSuccessful() || !parsed.getResult().isPresent()) {
                 throw new IOException("Cannot parse " + entry.getKey() + ": " + parsed.getProblems());
             }
             Source info = new Source();
-            parsed.getResult().orElseThrow().walk(node -> {
-                if (node instanceof TypeDeclaration<?> type) info.names.add(type.getNameAsString());
+            parsed.getResult().get().walk(node -> {
+                if (node instanceof TypeDeclaration<?>) {
+                    TypeDeclaration<?> type = (TypeDeclaration<?>) node;
+                    info.names.add(type.getNameAsString());
+                }
                 // Include qualified names (imports, annotations) and all simple identifiers.
-                if (node instanceof SimpleName name) info.references.add(name.asString());
-                if (node instanceof Name name) info.references.add(name.getIdentifier());
-                if (node instanceof ClassOrInterfaceDeclaration type) {
+                if (node instanceof SimpleName) {
+                    SimpleName name = (SimpleName) node;
+                    info.references.add(name.asString());
+                }
+                if (node instanceof Name) {
+                    Name name = (Name) node;
+                    info.references.add(name.getIdentifier());
+                }
+                if (node instanceof ClassOrInterfaceDeclaration) {
+                    ClassOrInterfaceDeclaration type = (ClassOrInterfaceDeclaration) node;
                     type.getExtendedTypes().forEach(parent -> addParent(parent, info));
                     type.getImplementedTypes().forEach(parent -> addParent(parent, info));
                 }
-                if (node instanceof EnumDeclaration type)
+                if (node instanceof EnumDeclaration) {
+                    EnumDeclaration type = (EnumDeclaration) node;
                     type.getImplementedTypes().forEach(parent -> addParent(parent, info));
-                if (node instanceof RecordDeclaration type)
+                }
+                if (node instanceof RecordDeclaration) {
+                    RecordDeclaration type = (RecordDeclaration) node;
                     type.getImplementedTypes().forEach(parent -> addParent(parent, info));
-                if (node instanceof AnnotationExpr annotation) {
+                }
+                if (node instanceof AnnotationExpr) {
+                    AnnotationExpr annotation = (AnnotationExpr) node;
                     String name = annotation.getName().getIdentifier();
                     if (GLOBAL.contains(name)) info.global = true;
                     if (STEPS.contains(name)) {
                         Expression argument = null;
-                        if (annotation instanceof SingleMemberAnnotationExpr single) {
+                        if (annotation instanceof SingleMemberAnnotationExpr) {
+                            SingleMemberAnnotationExpr single = (SingleMemberAnnotationExpr) annotation;
                             argument = single.getMemberValue();
-                        } else if (annotation instanceof NormalAnnotationExpr normal) {
+                        } else if (annotation instanceof NormalAnnotationExpr) {
+                            NormalAnnotationExpr normal = (NormalAnnotationExpr) annotation;
                             argument = normal.getPairs().stream()
                                     .filter(pair -> pair.getNameAsString().equals("value"))
                                     .map(pair -> pair.getValue()).findFirst().orElse(null);
@@ -240,10 +293,11 @@ public final class ImpactHelper {
     }
 
     private static String constantString(Expression expression) {
-        if (expression instanceof StringLiteralExpr literal) return literal.asString();
-        if (expression instanceof TextBlockLiteralExpr literal) return literal.asString();
-        if (expression instanceof EnclosedExpr enclosed) return constantString(enclosed.getInner());
-        if (expression instanceof BinaryExpr binary && binary.getOperator() == BinaryExpr.Operator.PLUS) {
+        if (expression instanceof StringLiteralExpr) return ((StringLiteralExpr) expression).asString();
+        if (expression instanceof TextBlockLiteralExpr) return ((TextBlockLiteralExpr) expression).asString();
+        if (expression instanceof EnclosedExpr) return constantString(((EnclosedExpr) expression).getInner());
+        if (expression instanceof BinaryExpr && ((BinaryExpr) expression).getOperator() == BinaryExpr.Operator.PLUS) {
+            BinaryExpr binary = (BinaryExpr) expression;
             String left = constantString(binary.getLeft()), right = constantString(binary.getRight());
             if (left != null && right != null) return left + right;
         }
@@ -256,12 +310,12 @@ public final class ImpactHelper {
                 declarations.computeIfAbsent(name, k -> new HashSet<>()).add(path)));
         sources.forEach((path, source) -> {
             for (String reference : source.references) {
-                for (String dependency : declarations.getOrDefault(reference, Set.of()))
+                for (String dependency : declarations.getOrDefault(reference, set()))
                     reverse.computeIfAbsent(dependency, k -> new HashSet<>()).add(path);
             }
             // Include interface/base-class consumers when an implementation/subclass changes.
             for (String parent : source.parents) {
-                for (String declaration : declarations.getOrDefault(parent, Set.of()))
+                for (String declaration : declarations.getOrDefault(parent, set()))
                     reverse.computeIfAbsent(path, k -> new HashSet<>()).add(declaration);
             }
         });
@@ -271,7 +325,7 @@ public final class ImpactHelper {
         Set<String> result = new TreeSet<>(seeds);
         Deque<String> queue = new ArrayDeque<>(seeds);
         while (!queue.isEmpty()) {
-            for (String user : reverse.getOrDefault(queue.removeFirst(), Set.of()))
+            for (String user : reverse.getOrDefault(queue.removeFirst(), set()))
                 if (result.add(user)) queue.addLast(user);
         }
         return result;
@@ -285,7 +339,7 @@ public final class ImpactHelper {
         String docDelimiter = null;
         String[] lines = text.split("\\R", -1);
         for (int i = 0; i < lines.length; i++) {
-            String line = lines[i].strip();
+            String line = lines[i].trim();
             if (docDelimiter != null) {
                 if (line.equals(docDelimiter)) docDelimiter = null;
                 continue;
@@ -293,7 +347,7 @@ public final class ImpactHelper {
             if (line.startsWith("\"\"\"") || line.startsWith("```")) {
                 docDelimiter = line.substring(0, 3); continue;
             }
-            if (line.startsWith("# language:") && !line.substring(11).strip().equals("en")) unsupported = true;
+            if (line.startsWith("# language:") && !line.substring(11).trim().equals("en")) unsupported = true;
             if (line.startsWith("Rule:")) unsupported = true; // Select whole feature; rule backgrounds have their own scope.
             if (line.startsWith("Background:")) { active = background; continue; }
             if (line.matches("(?:Scenario Outline|Scenario Template|Scenario|Example):.*")) {
@@ -301,7 +355,7 @@ public final class ImpactHelper {
                 scenarios.add(new Scenario(i + 1, active));
                 continue;
             }
-            var matcher = Pattern.compile("^(?:Given|When|Then|And|But|\\*)\\s+(.*)$").matcher(line);
+            java.util.regex.Matcher matcher = Pattern.compile("^(?:Given|When|Then|And|But|\\*)\\s+(.*)$").matcher(line);
             if (matcher.matches() && active != null) active.add(matcher.group(1));
         }
         if (scenarios.isEmpty() || docDelimiter != null) unsupported = true;
@@ -335,10 +389,10 @@ public final class ImpactHelper {
 
     public static void main(String[] args) throws IOException {
         if (args.length > 5 || (args.length == 5 && !args[4].equals("--full-suite"))) {
-            throw new IllegalArgumentException("Usage: java -jar helper.jar [repo] [base=master] [head=HEAD] [output=target/impact] [--full-suite]");
+            throw new IllegalArgumentException("Usage: ImpactHelper [repo] [base=master] [head=HEAD] [output=target/impact] [--full-suite]");
         }
-        Path repo = Path.of(args.length > 0 ? args[0] : ".");
-        Path output = args.length > 3 ? Path.of(args[3]) : repo.resolve("target/impact");
+        Path repo = Paths.get(args.length > 0 ? args[0] : ".");
+        Path output = args.length > 3 ? Paths.get(args[3]) : repo.resolve("target/impact");
         Result result = analyze(repo, args.length > 1 ? args[1] : "master", args.length > 2 ? args[2] : "HEAD", args.length == 5);
         result.writeTo(output);
         System.out.println("Selected " + result.selectors.size() + " scenario/feature selectors. Report: "

@@ -69,6 +69,27 @@ Maven/Gradle Dependency
 
 See https://jitpack.io/#selenium-cucumber/selenium-cucumber-java .
 
+
+PR impact analysis (Java 17+)
+----------------------------
+A standalone helper is available in [`tools/pr-impact`](tools/pr-impact/README.md).
+It compares a PR against `master`, traces changes in `src/main/java` and
+`src/test/java` to Cucumber scenarios, and writes an impact report and feature/line
+selectors. It uses JavaParser and has no `sun.*` or `com.sun.*` imports.
+
+Build and run from the repository root using JDK 17+:
+
+```powershell
+mvn -f tools/pr-impact/pom.xml clean package
+git fetch origin master
+java -jar tools/pr-impact/target/cucumber-impact-helper-1.0.0.jar . origin/master HEAD
+```
+
+The helper has its own Maven build. The existing Java 8 / Cucumber 1.2.5 framework
+build is unchanged. See the [tool documentation](tools/pr-impact/README.md) for
+running selected scenarios with this repository's legacy `cucumber.options`
+setting and for the limitations of static impact analysis.
+
 License
 -------
 

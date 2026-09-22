@@ -21,6 +21,7 @@ public class NavigateMethods extends SelectElementByType implements BaseTest
 	public void navigateTo(String url) 
 	{
 		driver.get(url);
+		System.out.println("Navigated to "+url);
 	}
 	
 	/** Method to navigate back & forward

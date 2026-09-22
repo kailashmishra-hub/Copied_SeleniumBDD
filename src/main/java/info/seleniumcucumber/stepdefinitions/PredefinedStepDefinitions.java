@@ -437,6 +437,7 @@ public class PredefinedStepDefinitions implements BaseTest {
 	{
 		miscmethodObj.validateLocator(type);
 		clickObj.click(type, accessName);
+		System.out.println("kailash");
 	}
 	
 	//Forcefully click on element

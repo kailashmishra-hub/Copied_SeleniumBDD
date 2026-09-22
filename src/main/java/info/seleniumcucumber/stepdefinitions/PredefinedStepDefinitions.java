@@ -437,7 +437,6 @@ public class PredefinedStepDefinitions implements BaseTest {
 	{
 		miscmethodObj.validateLocator(type);
 		clickObj.click(type, accessName);
-		System.out.println("kailash");
 	}
 	
 	//Forcefully click on element
@@ -446,6 +445,7 @@ public class PredefinedStepDefinitions implements BaseTest {
 	{
 		miscmethodObj.validateLocator(type);
 		clickObj.clickForcefully(type,accessName);
+		System.out.println("This is just a text");
 	}
 	
 	// double click on web element
